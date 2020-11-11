@@ -1,40 +1,39 @@
 
-#from playsound import playsound
 import wget
-#import winsound
 import os
-# os.add_dll_directory(r'E:\Programmieren\Python\MusicPlayer\vlc-3.0.11')
-#import vlc
-#from mpyg321.mpyg321 import MPyg321Player
 from pygame import mixer
+import sys
+import threading
+import time
+
+# this is to signal when the key_pressed flag has useful data,
+# it will be "set" to indicate that the key_pressed flag has been set
+# accordingly
+data_ready = threading.Event()
 
 
-#import multiprocessing
+class KeyboardPoller(threading.Thread):
+    def run(self):
+        global key_pressed
+        while True:
+            input("")
+            key_pressed = True
+            data_ready.set()
 
 
 def play(path):
-    # playsound(path)
-    # winsound.PlaySound(path, winsound.SND_ASYNC)
-    #p = multiprocessing.Process(target=playsound, args=(path,))
-    # p.start()
-    #p = vlc.MediaPlayer("file:///./song.mp3")
-    # p.play
-    # p.play_song(path)
     mixer.music.load(path)
     mixer.music.set_volume(0.2)
     mixer.music.play()
-    # return p
 
 
 def stop():
-    # process.terminate()
-    #winsound.PlaySound(None, winsound.SND_PURGE)
     mixer.music.stop()
     mixer.music.unload()
 
 
 def download():
-    print('Beginning download...')
+    #print('Beginning download...')
     url = 'http://localhost:81/songs/random'
 
     if os.path.exists('./song.mp3'):
@@ -44,12 +43,26 @@ def download():
     print()
 
 
-#p = MPyg321Player()
-mixer.init()
+def main():
+    poller = KeyboardPoller()
+    poller.start()
+    mixer.init()
 
-while True:
-    download()
-    play('./song.mp3')
-    input("press ENTER for new song")
-    print()
-    stop()
+    while True:
+        global key_pressed
+        download()
+        play('./song.mp3')
+        key_pressed = False
+        print("Press enter for new song")
+
+        while not data_ready.isSet():
+            time.sleep(0.01)
+
+        while mixer.music.get_busy() and not key_pressed:
+            time.sleep(0.1)
+
+        stop()
+
+
+if __name__ == "__main__":
+    main()
