@@ -13,6 +13,9 @@ GL_paused = False
 next_song = False
 GL_play_pause = False
 
+# http://www.kahunaburger.com/2008/10/13/selecting-random-weighted-records-from-mysql/
+# ORDER BY -LOG(1.0 – RAND()) / likelihood
+
 
 def on_press(key):
     if str(key) == 'Key.media_play_pause':
@@ -36,7 +39,7 @@ class KeyboardPoller(threading.Thread):
 
 def play(path):
     mixer.music.load(path)
-    mixer.music.set_volume(0.2)
+    mixer.music.set_volume(0.05)
     mixer.music.play()
     global GL_paused
     GL_paused = False
@@ -99,6 +102,13 @@ def toggle_play_pause():
         pause()
 
 
+def print_time():
+    if mixer.music.get_busy():
+        t = mixer.music.get_pos() / 1000
+        m, s = divmod(t, 60)
+        print("%d:%02d" % (m, s), end='\r')
+
+
 def main():
     mixer.init()
     poller = KeyboardPoller()
@@ -108,17 +118,23 @@ def main():
     listener_thread.start()
 
     while True:
+        print()
         download()
         print_songdata(GL_songname)
         play(GL_songname)
         global next_song
         next_song = False
         print("Press enter for new song")
-
+        print_time()
+        i = 0
         while mixer.music.get_busy() and not next_song:
+            if i >= 10:
+                i = 0
+                print_time()
             if GL_play_pause:
                 toggle_play_pause()
             time.sleep(0.1)
+            i += 1
 
         stop()
 
