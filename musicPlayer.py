@@ -6,15 +6,15 @@ import threading
 import time
 from eyed3 import id3, load
 from pynput.keyboard import Listener
+import urllib.request
 
 
+GL_hostname = "http://localhost:81/"
 GL_songname = './song.mp3'
 GL_paused = False
 next_song = False
 GL_play_pause = False
-
-# http://www.kahunaburger.com/2008/10/13/selecting-random-weighted-records-from-mysql/
-# ORDER BY -LOG(1.0 – RAND()) / likelihood
+GL_cur_id = 0
 
 
 def on_press(key):
@@ -38,6 +38,7 @@ class KeyboardPoller(threading.Thread):
 
 
 def play(path):
+    mixer.init()
     mixer.music.load(path)
     mixer.music.set_volume(0.05)
     mixer.music.play()
@@ -60,16 +61,35 @@ def resume():
 def stop():
     mixer.music.stop()
     mixer.music.unload()
+    mixer.quit()
 
 
 def download():
-    url = 'http://localhost:81/songs/random'
+    global GL_cur_id
 
     if os.path.exists(GL_songname):
         os.remove(GL_songname)
 
+    GL_cur_id = urllib.request.urlopen(
+        GL_hostname + "random_id").read().decode("utf-8")
+    url = GL_hostname + 'songs/' + GL_cur_id
     wget.download(url, GL_songname)
     print()
+
+
+def downvote():
+    urllib.request.urlopen(GL_hostname + "downvote/" + GL_cur_id)
+    print("downdoot")
+
+
+def downvote_lite():
+    urllib.request.urlopen(GL_hostname + "downvote_mini/" + GL_cur_id)
+    print("mini downdoot")
+
+
+def upvote():
+    urllib.request.urlopen(GL_hostname + "upvote/" + GL_cur_id)
+    print("updoot")
 
 
 def print_songdata(path):
@@ -77,8 +97,8 @@ def print_songdata(path):
     tag.parse(path)
     a = load(path)
 
-    print("Now playing: % s - %s: %s (%s)" %
-          (tag.title, tag.artist, tag.album, duration_from_seconds(a.info.time_secs)))
+    print("Now playing: % s - %s: %s (%s) - (ID %s)" %
+          (tag.title, tag.artist, tag.album, duration_from_seconds(a.info.time_secs), GL_cur_id))
 
 
 def duration_from_seconds(s):
@@ -110,7 +130,6 @@ def print_time():
 
 
 def main():
-    mixer.init()
     poller = KeyboardPoller()
     poller.start()
 
@@ -135,6 +154,13 @@ def main():
                 toggle_play_pause()
             time.sleep(0.1)
             i += 1
+        if next_song:
+            if (mixer.music.get_pos() / 1000 < 30):
+                downvote()
+            elif (mixer.music.get_pos() / 1000 < 90):
+                downvote_lite()
+        else:
+            upvote()
 
         stop()
 
